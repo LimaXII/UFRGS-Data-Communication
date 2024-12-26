@@ -4,53 +4,46 @@
 %   5 BPSK, 16-QAM LDPC n = 1944, R = {1/2}
 %
 % Proposta:
-%  Modelar sistema “completo” de comunicação de dados, contendo, no mínimo, 
+%  Modelar sistema completo de comunicação de dados, contendo, no mï¿½nimo, 
 %  os seguintes componentes: (1) Fonte de informação, 
 %  (2) Codificador de canal, (3) Modulação, (4) Ruído,
-%  (5) Demodulação, (6) Decodificador de canal, (7) Receptor de informação  
+%  (5) Demodulação, (6) Decodificador de canal, (7) Receptor de informação
 %
 % Objetivo:
 %  1) Avaliar um sistema completo em termos de bit error rate (BER) e 
-%  frame error rate (FER) variando parâmetros do sistema
+%  frame error rate (FER) variando parámetros do sistema
 %  2) Avaliação para um intervalo de Eb/N0
 %  3) Analisar a eficiência de códigos e modulações
 %  utilizadas no padrão IEEE 802.11
 %
-% Luccas da Silva Lima - 00xxxxxx
-% Matheus Almeida Silva - 00xxxxxx
+% Luccas da Silva Lima - 00324683 
+% Matheus Almeida Silva - 00316326
 % Thiago Leonel Rancan Bischoff - 00324856
 % -------------------------------------------------------------------------
 
-% Sem código --------------------------------------------------------------
+%código bpsk_complex.m
+clear;
+close;
+num_b = 1000000; %número de bits a serem simulados
+bits = complex(2*randi(2, 1, num_b)-3, 0); %bits aleatórios modulados em BPSK (parte real em 1 e -1)
+Eb_N0_dB = 0:1:9; %faixa de Eb/N0
+Eb_N0_lin = 10 .^ (Eb_N0_dB/10); %faixa de Eb/N0 linearizada
+ber = zeros(size(Eb_N0_lin)); %pré-alocação do vetor de BER
+Eb = 1; % energia por bit para a modulação BPSK utilizada
 
-% Variáveis
-Nb = 8; % Número de bits enviados
-EbNo = 10; % SNR (em dB)
+NP = Eb ./ (Eb_N0_lin); %vetor de potências do ruído
+NA = sqrt(NP); %vetor de amplitudes do ruído
+    
+for i = 1:length(Eb_N0_lin)
+    n = NA(i)*complex(randn(1, num_b), randn(1, num_b))*sqrt(0.5); %vetor de ruído complexo com desvio padrão igual a uma posição do vetor NA
+    r = bits + n; % vetor recebido
+    demod = sign(real(r)); % recupera a informação (sinal da parte real)
+    ber(i) = sum(bits ~= demod) / num_b; % contagem de erros e cálculo do BER
+end
 
-% (1) Fonte de informação
-sequencia_enviada = randi([0 1],1,Nb);
-
-% (3) Modulação
-bpskMod = comm.BPSKModulator; % Configurar o modulador BPSK
-modulatedSignal = step(bpskMod, sequencia_enviada.'); % Modulação
-
-% (4) Ruído
-noisySignal = awgn(modulatedSignal, EbNo, 'measured');
-
-% (5) Demodulação
-bpskDemod = comm.BPSKDemodulator;
-demodulatedData = step(bpskDemod, noisySignal);
-
-% Exibir a sequência enviada, o sinal modulado, sinal com ruído e sinal demodulado
-figure('Name', 'BPSK Sem código');
-subplot(4,1,1); stairs(real(sequencia_enviada), 'LineWidth',2); axis([1 Nb -0.1 1.1]); title('Sinal Enviado');
-subplot(4,1,2); stairs(real(modulatedSignal), 'LineWidth',2); axis([1 Nb -1.1 1.1]); title('Sinal Modulado');
-subplot(4,1,3); stairs(real(noisySignal), 'LineWidth',2); title('Sinal com Ruído');
-subplot(4,1,4); stairs(real(demodulatedData), 'LineWidth',2); axis([1 Nb -0.1 1.1]); title('Sinal Demodulado');
-
-
-% Com código e decodificação hard -----------------------------------------
-
-
-% Com código e decodificação soft -----------------------------------------
+ber_theoretical = 0.5*erfc(sqrt(2*Eb_N0_lin)/sqrt(2)); %BER teórico para comparação
+semilogy(Eb_N0_dB, ber, 'x', Eb_N0_dB, ber_theoretical, 'r', 'LineWidth', 2, 'MarkerSize', 10);
+xlabel('Eb/N0 (dB)');
+ylabel('BER');
+legend('Simulado','Teórico');
 
