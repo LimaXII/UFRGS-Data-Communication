@@ -24,7 +24,8 @@ clear;
 close;
 
 % Configurações
-num_b = 18400; % Número de bits por quadro (2300 bytes)
+num_b = 100000;
+frame_bits = 18400; % Número de bits por quadro (2300 bytes)
 frames = 1; % Número de quadros simulados
 Eb_N0_dB = 0:1:9; % Faixa de Eb/N0
 Eb_N0_lin = 10 .^ (Eb_N0_dB / 10); % Eb/N0 linearizado
@@ -41,15 +42,13 @@ block_length = n;
 info_length = block_length * R;
 
 % Criar o objeto LDPC
-%ldpc = LDPCCode(block_length, info_length);
+aux_ldpc = LDPCCode(block_length, info_length);
 
 % Carregar o código LDPC correspondente ao H_1944_1_2
-%ldpc.load_wifi_ldpc(block_length, R);
+aux_ldpc.load_wifi_ldpc(block_length, R);
 
 % Exibir a matriz H gerada
-%H = ldpc.H;
-%disp(size(H));
-H = dvbs2ldpc(1/2);
+H = sparse(logical(aux_ldpc.H));
 
 %Inicialização do ldpc
 ldpcEncoder = comm.LDPCEncoder(H);
@@ -60,16 +59,16 @@ ldpcDecoderSoft = comm.LDPCDecoder(H, 'DecisionMethod', 'Soft decision');
 K = size(H, 2) - size(H, 1); % Número de bits de entrada
 N = size(H, 2); % Número de bits codificados
 
+j = ceil(num_b / K); % Número de blocos (iteração por K bits)
+
+
 % Simulação
 for i = 1:length(Eb_N0_lin)
     num_bit_errors = zeros(3, 1);
-    num_frame_errors = zeros(3, 1);
-
-    for frame = 1:frames
-        disp(frame);
+    for block = 1:j
         % 1. Fonte de informação
         bits = randi([0 1], K, 1); % Gera bits aleatórios
-
+        
         % 2. Codificação de canal (LDPC)
         codedBits = step(ldpcEncoder, bits);
 
@@ -85,27 +84,23 @@ for i = 1:length(Eb_N0_lin)
         received_ldpc = modulated_ldpc + noise_ldpc;
 
         % 5. Demodulação
-        demod_no_code = real(received_no_code);
-        demod_ldpc = real(received_ldpc);
+        demod_no_code = (sign(real(received_no_code)) + 1) / 2;
+        demod_ldpc = (sign(real(received_ldpc)) + 1) / 2;
 
         % 6. Decodificação de canal
         decodedBitsHard = step(ldpcDecoderHard, demod_ldpc);
         decodedBitsSoft = step(ldpcDecoderSoft, demod_ldpc);
 
         % 7. Cálculo de erros para as 3 versões
-        num_bit_errors(1) = num_bit_errors(1) + sum(bits ~= (demod_no_code < 0)); % Sem LDPC
+        num_bit_errors(1) = num_bit_errors(1) + sum(bits ~= demod_no_code); % Sem LDPC
         num_bit_errors(2) = num_bit_errors(2) + sum(bits ~= decodedBitsHard); % LDPC Hard
         num_bit_errors(3) = num_bit_errors(3) + sum(bits ~= decodedBitsSoft); % LDPC Soft
-
-        num_frame_errors(1) = num_frame_errors(1) + any(bits ~= (demod_no_code < 0)); % Sem LDPC
-        num_frame_errors(2) = num_frame_errors(2) + any(bits ~= decodedBitsHard); % LDPC Hard
-        num_frame_errors(3) = num_frame_errors(3) + any(bits ~= decodedBitsSoft); % LDPC Soft
-        
     end
 
+    display(num_bit_errors);
     % 8. Calcula BER e FER
-    ber(:, i) = num_bit_errors / (frames * K);
-    fer(:, i) = num_frame_errors / frames;
+    ber(:, i) = num_bit_errors / (j * K);
+    fer(:, i) = 1 - (1 - ber(:, i)).^frame_bits; % Calculando o FER a partir do BER
 end
 
 % 9. Plots de desempenho
