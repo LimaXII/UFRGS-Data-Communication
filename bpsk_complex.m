@@ -1,26 +1,3 @@
-% Trabalho Final - Grupo 5
-%
-% Especificações:
-%   5 BPSK, 16-QAM LDPC n = 1944, R = {1/2}
-%
-% Proposta:
-%  Modelar sistema ï¿½completoï¿½ de comunicação de dados, contendo, no mï¿½nimo, 
-%  os seguintes componentes: (1) Fonte de informaï¿½ï¿½o, 
-%  (2) Codificador de canal, (3) Modulaï¿½ï¿½o, (4) Ruído,
-%  (5) Demodulaï¿½ï¿½o, (6) Decodificador de canal, (7) Receptor de informaï¿½ï¿½o  
-%
-% Objetivo:
-%  1) Avaliar um sistema completo em termos de bit error rate (BER) e 
-%  frame error rate (FER) variando parámetros do sistema
-%  2) Avaliação para um intervalo de Eb/N0
-%  3) Analisar a eficiência de códigos e modulações
-%  utilizadas no padrão IEEE 802.11
-%
-% Luccas da Silva Lima - 00324683 
-% Matheus Almeida Silva - 00316326
-% Thiago Leonel Rancan Bischoff - 00324856
-% -------------------------------------------------------------------------
-
 clear;
 close;
 num_b = 1000000; %número de bits a serem simulados
@@ -45,4 +22,3 @@ semilogy(Eb_N0_dB, ber, 'x', Eb_N0_dB, ber_theoretical, 'r', 'LineWidth', 2, 'Ma
 xlabel('Eb/N0 (dB)');
 ylabel('BER');
 legend('Simulado','Teórico');
-
