@@ -41,14 +41,15 @@ block_length = n;
 info_length = block_length * R;
 
 % Criar o objeto LDPC
-ldpc = LDPCCode(block_length, info_length);
+%ldpc = LDPCCode(block_length, info_length);
 
 % Carregar o código LDPC correspondente ao H_1944_1_2
-ldpc.load_wifi_ldpc(block_length, R);
+%ldpc.load_wifi_ldpc(block_length, R);
 
 % Exibir a matriz H gerada
-H = ldpc.H;
-disp(size(H));
+%H = ldpc.H;
+%disp(size(H));
+H = dvbs2ldpc(1/2);
 
 %Inicialização do ldpc
 ldpcEncoder = comm.LDPCEncoder(H);
