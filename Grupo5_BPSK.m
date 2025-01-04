@@ -1,7 +1,7 @@
 % Trabalho Final - Grupo 5
 %
 % Especificações:
-%   5 BPSK, 16-QAM LDPC n = 1944, R = {1/2}
+%   5 BPSK, 16-QAM LDPC N = 1944, R = {1/2}
 %
 % Proposta:
 %  Modelar sistema completo de comunicação de dados, contendo, no mínimo,
@@ -24,9 +24,8 @@ clear;
 close;
 
 % Configurações
-num_b = 100000;
-frame_bits = 18400; % Número de bits por quadro (2300 bytes)
-frames = 1; % Número de quadros simulados
+num_b = 1000000;
+frame_bits = 18400; % Número de bits por quadro (2300 bytes) para FER
 Eb_N0_dB = 0:1:9; % Faixa de Eb/N0
 Eb_N0_lin = 10 .^ (Eb_N0_dB / 10); % Eb/N0 linearizado
 ber = zeros(3, length(Eb_N0_lin)); % BER para as 3 versões
@@ -35,17 +34,16 @@ Eb = 1; % Energia por bit para BPSK
 NP = Eb ./ Eb_N0_lin; % Potência do ruído
 NA = sqrt(NP); % Amplitudes do ruído
 
-obj = struct(); % Usando um objeto struct para armazenar dados
-n = 1944;  % Tamanho do código
+%Configurações LDPC
+N = 1944;  % Tamanho do código
 R = 1/2;   % Taxa do código
-block_length = n;
-info_length = block_length * R;
+info_length = N * R;
 
 % Criar o objeto LDPC
-aux_ldpc = LDPCCode(block_length, info_length);
+aux_ldpc = LDPCCode(N, info_length);
 
 % Carregar o código LDPC correspondente ao H_1944_1_2
-aux_ldpc.load_wifi_ldpc(block_length, R);
+aux_ldpc.load_wifi_ldpc(N, R);
 
 % Exibir a matriz H gerada
 H = sparse(logical(aux_ldpc.H));
@@ -55,26 +53,29 @@ ldpcEncoder = comm.LDPCEncoder(H);
 ldpcDecoderHard = comm.LDPCDecoder(H, 'DecisionMethod', 'Hard decision');
 ldpcDecoderSoft = comm.LDPCDecoder(H, 'DecisionMethod', 'Soft decision');
 
-% Determinar os tamanhos K e N
-K = size(H, 2) - size(H, 1); % Número de bits de entrada
-N = size(H, 2); % Número de bits codificados
 
-j = ceil(num_b / K); % Número de blocos (iteração por K bits)
+%Inicialização do BPSK mod e demod
+pskDemodHard = comm.PSKDemodulator(2, 'BitOutput', true, 'DecisionMethod', 'Hard decision');
 
+% Fonte de informação
+data = randi([0 1], num_b, 1); % Gera bits aleatórios
+blocks = ceil(length(data) / info_length); % Número de blocos (iteração por info_length bits)
+data = [data; zeros(blocks * info_length - length(data), 1)];% Ajusta o tamanho de 'data' para múltiplo de 'info_length' se necessário
+data_reshaped = reshape(data, info_length, blocks);% Reshape 'data' para que cada coluna tenha 'info_length' bits
 
 % Simulação
 for i = 1:length(Eb_N0_lin)
     num_bit_errors = zeros(3, 1);
-    for block = 1:j
-        % 1. Fonte de informação
-        bits = randi([0 1], K, 1); % Gera bits aleatórios
+    for j = 1:blocks
+        % 1. Seleciona o bloco atual de bits
+        bits = logical(data_reshaped(:, j)); % Pega o bloco de info_length bits
         
         % 2. Codificação de canal (LDPC)
         codedBits = step(ldpcEncoder, bits);
 
         % 3. Modulação (BPSK com símbolos complexos)
-        modulated_no_code = complex(1 - 2 * bits, 0); % Sem LDPC
-        modulated_ldpc = complex(1 - 2 * codedBits, 0); % Com LDPC
+        modulated_no_code = complex(2 * bits - 1, 0); % Sem LDPC
+        modulated_ldpc = complex(2 * codedBits - 1, 0); % Com LDPC
 
         % 4. Ruído AWGN (complexo)
         noise_no_code = NA(i) * complex(randn(size(modulated_no_code)), randn(size(modulated_no_code))) * sqrt(0.5);
@@ -85,11 +86,12 @@ for i = 1:length(Eb_N0_lin)
 
         % 5. Demodulação
         demod_no_code = (sign(real(received_no_code)) + 1) / 2;
-        demod_ldpc = (sign(real(received_ldpc)) + 1) / 2;
-
+        demod_ldpc = 1 - ((sign(real(received_ldpc)) + 1) / 2) * 2; 
+        
         % 6. Decodificação de canal
         decodedBitsHard = step(ldpcDecoderHard, demod_ldpc);
-        decodedBitsSoft = step(ldpcDecoderSoft, demod_ldpc);
+        decodedBitsSoftllr = step(ldpcDecoderSoft,  demod_ldpc);
+        decodedBitsSoft = decodedBitsSoftllr < -0.9;
 
         % 7. Cálculo de erros para as 3 versões
         num_bit_errors(1) = num_bit_errors(1) + sum(bits ~= demod_no_code); % Sem LDPC
@@ -99,7 +101,7 @@ for i = 1:length(Eb_N0_lin)
 
     display(num_bit_errors);
     % 8. Calcula BER e FER
-    ber(:, i) = num_bit_errors / (j * K);
+    ber(:, i) = num_bit_errors / (j * info_length);
     fer(:, i) = 1 - (1 - ber(:, i)).^frame_bits; % Calculando o FER a partir do BER
 end
 
